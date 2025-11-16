@@ -80,6 +80,30 @@ describe('E2E тестирование конструктора бургеров
         cy.reload(true);
         cy.get(selectors.modalData).should('be.visible');
       });
+
+      it('Модальное окно показывает данные выбранного ингредиента', () => {
+        const ingredientName = 'Биокотлета из марсианской Магнолии';
+
+        cy.contains(ingredientName).click();
+
+        cy.get(selectors.modalData)
+          .should('be.visible')
+          .within(() => {
+            cy.contains(ingredientName).should('exist');
+          });
+
+        cy.fixture('ingredients').then((json) => {
+          const item = json.data.find((i: any) => i.name === ingredientName);
+          expect(item, 'fixture ingredient exists').to.exist;
+
+          cy.get(selectors.modalData).within(() => {
+            cy.contains(String(item.calories)).should('exist');
+            cy.contains(String(item.proteins)).should('exist');
+            cy.contains(String(item.fat)).should('exist');
+            cy.contains(String(item.carbohydrates)).should('exist');
+          });
+        });
+      });
     });
 
     describe('Проверка закрытия', () => {
