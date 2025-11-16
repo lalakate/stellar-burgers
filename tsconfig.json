@@ -29,5 +29,5 @@
       "@utils-cookie": ["src/utils/cookie"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "__test__"]
 }
