@@ -1,0 +1,140 @@
+import { selectors } from 'cypress/support/selectors';
+
+describe('E2E тестирование конструктора бургеров', () => {
+  beforeEach(() => {
+    cy.setCookie('accessToken', 'fakeAccessToken');
+    localStorage.setItem('refreshToken', 'fakeRefreshToken');
+
+    cy.intercept('GET', `${Cypress.env('BURGER_API_URL')}/ingredients`, {
+      fixture: 'ingredients'
+    }).as('getIngredients');
+
+    cy.intercept('GET', `${Cypress.env('BURGER_API_URL')}/auth/user`, {
+      fixture: 'user'
+    }).as('getUser');
+
+    cy.intercept('POST', `${Cypress.env('BURGER_API_URL')}/orders`, {
+      fixture: 'order'
+    }).as('createOrder');
+
+    cy.visit('/');
+    cy.wait(['@getIngredients', '@getUser']);
+  });
+
+  afterEach(() => {
+    cy.clearCookie('accessToken');
+    localStorage.removeItem('refreshToken');
+  });
+
+  describe('Проверка наличия ингредиентов', () => {
+    it('Ингредиенты загружены и доступны для выбора', () => {
+      cy.get(selectors.ingredientBun).should('have.length.at.least', 1);
+      cy.get(selectors.ingredientMain).should('have.length.at.least', 1);
+      cy.get(selectors.ingredientSauce).should('have.length.at.least', 1);
+    });
+  });
+
+  describe('Проверка конструктора бургеров', () => {
+    it('Добавление ингредиентов в конструктор', () => {
+      cy.get(selectors.burgerConstructorSection)
+        .find('.constructor-element__text')
+        .should('have.length', 0);
+
+      cy.addIngredient('bun');
+      cy.get(selectors.burgerConstructorSection).within(() => {
+        cy.get('.constructor-element__text')
+          .contains('Краторная булка N-200i (верх)')
+          .should('exist');
+        cy.get('.constructor-element__text')
+          .contains('Краторная булка N-200i (низ)')
+          .should('exist');
+      });
+      cy.get(selectors.burgerConstructorButton).should('be.disabled');
+
+      cy.addIngredient('main');
+      cy.get(selectors.burgerConstructorSection).within(() => {
+        cy.get('.constructor-element__text')
+          .contains('Биокотлета из марсианской Магнолии')
+          .should('exist');
+      });
+      cy.get(selectors.burgerConstructorButton).should('be.enabled');
+
+      cy.addIngredient('sauce');
+      cy.get(selectors.burgerConstructorSection).within(() => {
+        cy.get('.constructor-element__text')
+          .contains('Соус с шипами Антарианского плоскоходца')
+          .should('exist');
+      });
+      cy.get(selectors.burgerConstructorButton).should('be.enabled');
+    });
+  });
+
+  describe('Проверка работы модальных окон', () => {
+    describe('Проверка открытия', () => {
+      it('Открытие модального окна ингредиента', () => {
+        cy.openIngredientModal();
+      });
+
+      it('Модальное окно открыто после перезагрузки страницы', () => {
+        cy.openIngredientModal();
+        cy.reload(true);
+        cy.get(selectors.modalData).should('be.visible');
+      });
+
+      it('Модальное окно показывает данные выбранного ингредиента', () => {
+        const ingredientName = 'Биокотлета из марсианской Магнолии';
+
+        cy.contains(ingredientName).click();
+
+        cy.get(selectors.modalData)
+          .should('be.visible')
+          .within(() => {
+            cy.contains(ingredientName).should('exist');
+          });
+
+        cy.fixture('ingredients').then((json) => {
+          const item = json.data.find((i: any) => i.name === ingredientName);
+          expect(item, 'fixture ingredient exists').to.exist;
+
+          cy.get(selectors.modalData).within(() => {
+            cy.contains(String(item.calories)).should('exist');
+            cy.contains(String(item.proteins)).should('exist');
+            cy.contains(String(item.fat)).should('exist');
+            cy.contains(String(item.carbohydrates)).should('exist');
+          });
+        });
+      });
+    });
+
+    describe('Проверка закрытия', () => {
+      it('По клику на крестик', () => {
+        cy.openIngredientModal();
+        cy.closeModal('button');
+      });
+
+      it('По клику на оверлей', () => {
+        cy.openIngredientModal();
+        cy.closeModal('overlay');
+      });
+
+      it('По клику на Escape', () => {
+        cy.openIngredientModal();
+        cy.closeModal('escape');
+      });
+    });
+  });
+
+  describe('Проверка создания заказа', () => {
+    it('Создание заказа', () => {
+      cy.addIngredient('bun');
+      cy.addIngredient('main');
+      cy.get(selectors.burgerConstructorButton).should('be.enabled');
+
+      cy.createOrder();
+
+      cy.get(selectors.burgerConstructorSection)
+        .find('.constructor-element__text')
+        .should('have.length', 0);
+    });
+  });
+});
